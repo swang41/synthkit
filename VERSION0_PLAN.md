@@ -18,6 +18,11 @@ Ship a small, usable package for synthetic data generation focused on **Hugging 
 ### 2) Text augmentation (MVP)
 - Input: seed texts.
 - Output: augmented text records with metadata.
+- Value: quickly expand small labeled/unlabeled corpora for training and validation without collecting new raw text.
+- Core use cases:
+  - Classification robustness: generate paraphrases/rewrites to reduce overfitting to phrasing.
+  - Data balancing: create additional examples for minority labels/slices.
+  - Validation stress tests: generate harder/easier wording variants to test model stability.
 
 ### 3) RAG retrieval-validation data generation (MVP)
 - Input: document chunks.
