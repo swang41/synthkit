@@ -1,5 +1,5 @@
 # synthkit
-__SynthKit__ is a lightweight Python toolkit for synthetic data generation with a Hugging Face-first approach. v0 focuses on the core: text augmentation, RAG retrieval-validation data generation, and tabular synthesis.
+__SynthKit__ is a lightweight Python toolkit for synthetic data generation with a Hugging Face-first approach. v0 focuses on the core: text augmentation for train/validation data, RAG retrieval-validation data generation, and tabular synthesis.
 
 ## Install
 ```bash
@@ -34,3 +34,6 @@ Default model in `SynthKitConfig` is set to `TinyLlama/TinyLlama-1.1B-Chat-v1.0`
 
 ## Planning
 - Version 0 implementation plan: [`VERSION0_PLAN.md`](./VERSION0_PLAN.md)
+
+
+Tabular synthesis supports optional prompt constraints via `requirements=`.

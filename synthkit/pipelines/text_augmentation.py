@@ -10,7 +10,9 @@ def augment_texts(
     operation: str,
     provider: TextProvider,
     config: SynthKitConfig,
+    label: str | None = None,
 ) -> list[dict]:
+    """Generate synthetic text variants for training/validation datasets."""
     outputs: list[dict] = []
     for i, text in enumerate(texts):
         prompt = f"Operation: {operation}\nText: {text}\nResult:"
@@ -27,6 +29,7 @@ def augment_texts(
                 "operation": operation,
                 "augmented_text": generated,
                 "seed": config.seed + i,
+                "label": label,
             }
         )
     return outputs

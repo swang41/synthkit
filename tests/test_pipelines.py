@@ -13,9 +13,11 @@ def test_text_augmentation_shape():
         operation="paraphrase",
         provider=MockProvider(),
         config=SynthKitConfig(seed=1),
+        label="train",
     )
     assert out[0]["operation"] == "paraphrase"
     assert "augmented_text" in out[0]
+    assert out[0]["label"] == "train"
 
 
 def test_rag_validation_shape():
@@ -28,7 +30,12 @@ def test_rag_validation_shape():
 
 def test_tabular_shape():
     out = synthesize_rows(
-        {"a": "int"}, num_rows=2, provider=MockProvider(), config=SynthKitConfig(seed=1)
+        {"a": "int"},
+        num_rows=2,
+        provider=MockProvider(),
+        config=SynthKitConfig(seed=1),
+        requirements="a must be >= 0",
     )
     assert len(out) == 2
     assert "raw" in out[0]
+    assert "a must be >= 0" in out[0]["raw"]

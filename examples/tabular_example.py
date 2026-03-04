@@ -9,6 +9,7 @@ rows = synthesize_rows(
     num_rows=2,
     provider=provider,
     config=config,
+    requirements="age between 18 and 65; city from US major cities",
 )
 
 print(rows)
