@@ -7,6 +7,12 @@ pip install -e .
 pip install -e '.[hf]'
 ```
 
+If you're in a restricted network where build isolation cannot download from PyPI, use:
+```bash
+pip install --no-build-isolation -e .
+poetry install --only-root
+```
+
 ## Quickstart
 ```python
 from synthkit import SynthKitConfig, augment_texts

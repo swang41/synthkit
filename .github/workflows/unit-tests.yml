@@ -31,6 +31,13 @@ jobs:
       - name: Run unit tests
         run: pytest -q
 
+      - name: Verify install works without build isolation
+        run: |
+          python -m venv .venv-no-isolation
+          . .venv-no-isolation/bin/activate
+          pip install --upgrade pip setuptools wheel
+          pip install --no-build-isolation -e .
+
       - name: Build package artifacts
         run: |
           pip install build
