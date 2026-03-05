@@ -1,26 +1,46 @@
 from __future__ import annotations
 
+from threading import Lock
+
 from synthkit.providers.base import TextProvider
 
 
 class HuggingFaceProvider(TextProvider):
-    """HF Inference API backed provider (lightweight dependency via huggingface_hub)."""
+    """Run open-source Hugging Face models locally via transformers."""
 
-    def __init__(self, model: str, token: str | None = None) -> None:
+    def __init__(self, model: str, token: str | None = None, device: str = "auto") -> None:
         self.model = model
+        self.device = device
         self._token = token
-        self._client = None
+        self._pipeline = None
+        self._lock = Lock()
 
-    def _get_client(self):
-        if self._client is None:
+    def _get_pipeline(self):
+        if self._pipeline is not None:
+            return self._pipeline
+
+        with self._lock:
+            if self._pipeline is not None:
+                return self._pipeline
+
             try:
-                from huggingface_hub import InferenceClient
+                from transformers import pipeline
             except ImportError as exc:
                 raise RuntimeError(
-                    "huggingface_hub is not installed. Install with: pip install 'synthkit[hf]'"
+                    "transformers is not installed. Install with: pip install 'synthkit[local]'"
                 ) from exc
-            self._client = InferenceClient(model=self.model, token=self._token)
-        return self._client
+
+            model_kwargs = {}
+            if self._token:
+                model_kwargs["token"] = self._token
+
+            self._pipeline = pipeline(
+                task="text-generation",
+                model=self.model,
+                device_map=self.device,
+                **model_kwargs,
+            )
+            return self._pipeline
 
     def generate(
         self,
@@ -30,11 +50,14 @@ class HuggingFaceProvider(TextProvider):
         temperature: float = 0.7,
         seed: int = 42,
     ) -> str:
-        client = self._get_client()
-        output = client.text_generation(
+        pipe = self._get_pipeline()
+        output = pipe(
             prompt,
             max_new_tokens=max_new_tokens,
             temperature=temperature,
             seed=seed,
+            return_full_text=False,
         )
-        return output.strip()
+        if not output:
+            return ""
+        return output[0]["generated_text"].strip()
