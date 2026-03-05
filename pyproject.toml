@@ -12,6 +12,7 @@ dependencies = []
 
 [project.optional-dependencies]
 hf = ["huggingface_hub>=0.23.0"]
+ui = ["gradio>=4.0.0"]
 dev = ["pytest>=8.0.0"]
 
 [tool.setuptools.packages.find]
