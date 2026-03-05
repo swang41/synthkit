@@ -31,6 +31,17 @@ Default model in `SynthKitConfig` is set to `TinyLlama/TinyLlama-1.1B-Chat-v1.0`
 - `examples/text_augmentation_example.py`
 - `examples/rag_validation_example.py`
 - `examples/tabular_example.py`
+- `examples/gradio_demo.py`
+
+
+## Gradio quick demo
+```bash
+pip install -e '.[ui]'
+python examples/gradio_demo.py
+```
+
+The demo includes tabs for text augmentation, RAG validation, and tabular synthesis. Use the `mock` provider for an instant local demo, or switch to `huggingface` and provide an HF token.
+
 
 ## Planning
 - Version 0 implementation plan: [`VERSION0_PLAN.md`](./VERSION0_PLAN.md)
