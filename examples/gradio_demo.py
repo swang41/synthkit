@@ -13,11 +13,18 @@ from synthkit import (
 )
 from synthkit.providers.huggingface import HuggingFaceProvider
 from synthkit.providers.mock import MockProvider
+from synthkit.providers.remote import RemoteLLMProvider
 
 
-def _build_provider(provider_name: str, model: str, token: str):
+def _build_provider(provider_name: str, model: str, token: str, endpoint_url: str):
     if provider_name == "mock":
         return MockProvider()
+    if provider_name == "remote":
+        return RemoteLLMProvider(
+            endpoint_url=endpoint_url,
+            model=model,
+            api_key=token or None,
+        )
     return HuggingFaceProvider(model=model, token=token or None)
 
 
@@ -51,6 +58,7 @@ def run_text_augmentation(
     provider_name: str,
     model: str,
     token: str,
+    endpoint_url: str,
     max_new_tokens: int,
     temperature: float,
     seed: int,
@@ -59,7 +67,7 @@ def run_text_augmentation(
     if not texts:
         return {"error": "Please provide at least one source text."}
 
-    provider = _build_provider(provider_name, model, token)
+    provider = _build_provider(provider_name, model, token, endpoint_url)
     config = SynthKitConfig(
         model=model,
         max_new_tokens=max_new_tokens,
@@ -83,6 +91,7 @@ def run_rag_validation(
     provider_name: str,
     model: str,
     token: str,
+    endpoint_url: str,
     max_new_tokens: int,
     temperature: float,
     seed: int,
@@ -91,7 +100,7 @@ def run_rag_validation(
     if not chunks:
         return {"error": "Please provide at least one knowledge chunk."}
 
-    provider = _build_provider(provider_name, model, token)
+    provider = _build_provider(provider_name, model, token, endpoint_url)
     config = SynthKitConfig(
         model=model,
         max_new_tokens=max_new_tokens,
@@ -115,11 +124,12 @@ def run_tabular(
     provider_name: str,
     model: str,
     token: str,
+    endpoint_url: str,
     max_new_tokens: int,
     temperature: float,
     seed: int,
 ):
-    provider = _build_provider(provider_name, model, token)
+    provider = _build_provider(provider_name, model, token, endpoint_url)
     config = SynthKitConfig(
         model=model,
         max_new_tokens=max_new_tokens,
@@ -140,22 +150,26 @@ def run_tabular(
 
 def create_demo() -> gr.Blocks:
     with gr.Blocks(title="SynthKit Demo") as demo:
-        gr.Markdown("# SynthKit quick demo\nGenerate synthetic examples with Mock or Hugging Face providers.")
+        gr.Markdown("# SynthKit quick demo\nGenerate synthetic examples with mock, local Hugging Face, or remote LLM providers.")
 
         with gr.Accordion("Shared generation settings", open=True):
             provider_name = gr.Radio(
-                ["mock", "huggingface"],
+                ["mock", "huggingface_local", "remote"],
                 value="mock",
                 label="Provider",
             )
             model = gr.Textbox(
                 value="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-                label="Model (for Hugging Face provider)",
+                label="Model (local or remote provider)",
             )
             token = gr.Textbox(
                 value=os.environ.get("HF_TOKEN", ""),
                 type="password",
-                label="HF token (optional if already set in env)",
+                label="Token/API key (optional)",
+            )
+            endpoint_url = gr.Textbox(
+                value=os.environ.get("LLM_ENDPOINT_URL", "http://localhost:8000/v1/chat/completions"),
+                label="Remote endpoint URL (OpenAI-compatible)",
             )
             max_new_tokens = gr.Slider(16, 512, value=64, step=8, label="max_new_tokens")
             temperature = gr.Slider(0.0, 1.5, value=0.7, step=0.1, label="temperature")
@@ -175,6 +189,7 @@ def create_demo() -> gr.Blocks:
                     provider_name,
                     model,
                     token,
+                    endpoint_url,
                     max_new_tokens,
                     temperature,
                     seed,
@@ -192,6 +207,7 @@ def create_demo() -> gr.Blocks:
                     provider_name,
                     model,
                     token,
+                    endpoint_url,
                     max_new_tokens,
                     temperature,
                     seed,
@@ -221,6 +237,7 @@ def create_demo() -> gr.Blocks:
                     provider_name,
                     model,
                     token,
+                    endpoint_url,
                     max_new_tokens,
                     temperature,
                     seed,
