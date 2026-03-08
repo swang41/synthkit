@@ -18,3 +18,8 @@ dev = ["pytest>=8.0.0"]
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["synthkit*"]
+
+[dependency-groups]
+dev = [
+    "ipykernel (>=7.2.0,<8.0.0)"
+]
