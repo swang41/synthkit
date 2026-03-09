@@ -51,11 +51,19 @@ class HuggingFaceProvider(TextProvider):
         seed: int = 42,
     ) -> str:
         pipe = self._get_pipeline()
+
+        try:
+            from transformers import set_seed
+        except ImportError:
+            set_seed = None
+
+        if set_seed is not None:
+            set_seed(seed)
+
         output = pipe(
             prompt,
             max_new_tokens=max_new_tokens,
             temperature=temperature,
-            seed=seed,
             return_full_text=False,
         )
         if not output:
