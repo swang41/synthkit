@@ -64,9 +64,12 @@ class LocalQualityScorer:
                     "transformers is not installed. "
                     "Install with: pip install 'synthkit[quality]'"
                 ) from exc
-            self._lm_tokenizer = AutoTokenizer.from_pretrained(self._perplexity_model_name)
-            self._lm_model = AutoModelForCausalLM.from_pretrained(self._perplexity_model_name)
-            self._lm_model.eval()
+            # Load into locals first so partial failure leaves state consistent.
+            tok = AutoTokenizer.from_pretrained(self._perplexity_model_name)
+            mdl = AutoModelForCausalLM.from_pretrained(self._perplexity_model_name)
+            mdl.eval()
+            self._lm_tokenizer = tok
+            self._lm_model = mdl
             return self._lm_model, self._lm_tokenizer
 
     # ------------------------------------------------------------------
@@ -75,16 +78,15 @@ class LocalQualityScorer:
 
     def semantic_similarity(self, text1: str, text2: str) -> float:
         """Cosine similarity between sentence embeddings. Range: -1 to 1."""
+        import numpy as np  # always available: sentence-transformers requires numpy
+
         model = self._get_st_model()
         emb = model.encode([text1, text2], convert_to_numpy=True)
-        a, b = list(emb[0]), list(emb[1])
-        dot = sum(float(x) * float(y) for x, y in zip(a, b))
-        norm_a = sum(float(x) ** 2 for x in a) ** 0.5
-        norm_b = sum(float(x) ** 2 for x in b) ** 0.5
-        denom = norm_a * norm_b
+        a, b = emb[0], emb[1]
+        denom = float(np.linalg.norm(a) * np.linalg.norm(b))
         if denom == 0.0:
             return 0.0
-        return dot / denom
+        return float(np.dot(a, b) / denom)
 
     def perplexity(self, text: str) -> float:
         """Token-level perplexity using distilgpt2. Lower = more fluent."""
@@ -98,7 +100,11 @@ class LocalQualityScorer:
             return float("inf")
         with torch.no_grad():
             outputs = model(input_ids, labels=input_ids)
-        return math.exp(outputs.loss.item())
+        loss = outputs.loss.item()
+        # Guard against OverflowError on nonsensical/very short text (loss > ~709)
+        if loss > 709.0:
+            return float("inf")
+        return math.exp(loss)
 
     def ngram_diversity(self, text: str, n: int = 2) -> float:
         """Ratio of unique n-grams to total n-grams. Range: 0 to 1."""

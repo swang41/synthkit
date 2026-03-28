@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from threading import Lock
 
 from synthkit.providers.base import TextProvider
@@ -17,6 +18,7 @@ class AnthropicProvider(TextProvider):
         self._api_key = api_key
         self._client = None
         self._lock = Lock()
+        self._seed_warned = False
 
     def _get_client(self):
         if self._client is not None:
@@ -44,8 +46,13 @@ class AnthropicProvider(TextProvider):
         temperature: float = 0.7,
         seed: int = 42,
     ) -> str:
-        # Note: Anthropic does not expose a seed parameter; reproducibility
-        # is not guaranteed for the same inputs across calls.
+        if not self._seed_warned:
+            self._seed_warned = True
+            warnings.warn(
+                "AnthropicProvider does not support seed; outputs may vary across calls.",
+                UserWarning,
+                stacklevel=2,
+            )
         client = self._get_client()
         response = client.messages.create(
             model=self.model,

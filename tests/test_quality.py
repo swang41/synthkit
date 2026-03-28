@@ -21,6 +21,20 @@ def _make_st_model(vectors: list[list[float]]) -> MagicMock:
     return mock
 
 
+def _make_mock_numpy() -> MagicMock:
+    """Return a MagicMock simulating the numpy functions used by semantic_similarity.
+
+    sentence-transformers requires numpy as a transitive dependency, so numpy is
+    always present in production. In tests we inject this mock so the CI environment
+    does not need numpy installed.
+    """
+    mock_np = MagicMock()
+    mock_np.linalg = MagicMock()
+    mock_np.linalg.norm = lambda v: sum(float(x) ** 2 for x in v) ** 0.5
+    mock_np.dot = lambda a, b: sum(float(x) * float(y) for x, y in zip(a, b))
+    return mock_np
+
+
 def _make_lm(loss: float):
     """Return (mock_model, mock_tokenizer) that simulate distilgpt2 with a fixed loss."""
     fake_output = MagicMock()
@@ -54,36 +68,40 @@ def _make_lm_empty():
 def test_semantic_similarity_identical_vectors():
     scorer = LocalQualityScorer()
     scorer._st_model = _make_st_model([[1.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
-    sim = scorer.semantic_similarity("hello", "hello")
+    with patch.dict(sys.modules, {"numpy": _make_mock_numpy()}):
+        sim = scorer.semantic_similarity("hello", "hello")
     assert abs(sim - 1.0) < 1e-4
 
 
 def test_semantic_similarity_orthogonal_vectors():
     scorer = LocalQualityScorer()
     scorer._st_model = _make_st_model([[1.0, 0.0], [0.0, 1.0]])
-    sim = scorer.semantic_similarity("foo", "bar")
+    with patch.dict(sys.modules, {"numpy": _make_mock_numpy()}):
+        sim = scorer.semantic_similarity("foo", "bar")
     assert abs(sim - 0.0) < 1e-4
 
 
 def test_semantic_similarity_zero_vector_returns_zero():
     scorer = LocalQualityScorer()
     scorer._st_model = _make_st_model([[0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
-    assert scorer.semantic_similarity("a", "b") == 0.0
+    with patch.dict(sys.modules, {"numpy": _make_mock_numpy()}):
+        result = scorer.semantic_similarity("a", "b")
+    assert result == 0.0
 
 
 def test_semantic_similarity_partial_overlap():
     scorer = LocalQualityScorer()
     # [1, 1] and [1, 0] → cos = 1/sqrt(2) ≈ 0.7071
     scorer._st_model = _make_st_model([[1.0, 1.0], [1.0, 0.0]])
-    sim = scorer.semantic_similarity("x", "y")
+    with patch.dict(sys.modules, {"numpy": _make_mock_numpy()}):
+        sim = scorer.semantic_similarity("x", "y")
     assert abs(sim - (1.0 / (2 ** 0.5))) < 1e-4
 
 
 def test_semantic_similarity_requires_sentence_transformers():
     scorer = LocalQualityScorer()
-    # Ensure _st_model is not cached
     scorer._st_model = None
-    with patch.dict(sys.modules, {"sentence_transformers": None}):
+    with patch.dict(sys.modules, {"sentence_transformers": None, "numpy": _make_mock_numpy()}):
         with pytest.raises(RuntimeError, match="sentence-transformers is not installed"):
             scorer.semantic_similarity("a", "b")
 
@@ -112,6 +130,17 @@ def test_perplexity_returns_exp_loss():
         ppl = scorer.perplexity("some text")
 
     assert abs(ppl - math.exp(loss)) < 1e-2
+
+
+def test_perplexity_high_loss_returns_inf():
+    """Loss > 709 would overflow math.exp; should return float('inf')."""
+    scorer = LocalQualityScorer()
+    scorer._lm_model, scorer._lm_tokenizer = _make_lm(710.0)
+
+    with patch.dict(sys.modules, {"torch": _make_mock_torch()}):
+        ppl = scorer.perplexity("some text")
+
+    assert ppl == float("inf")
 
 
 def test_perplexity_empty_sequence_returns_inf():
@@ -180,11 +209,11 @@ def test_ngram_diversity_trigrams():
 
 def test_score_returns_all_keys():
     scorer = LocalQualityScorer()
-    # Inject mocks so no real model loading occurs
     scorer._st_model = _make_st_model([[1.0, 0.0], [0.9, 0.1]])
 
-    with patch.object(scorer, "perplexity", return_value=50.0):
-        result = scorer.score("hello world", "hello world again here")
+    with patch.dict(sys.modules, {"numpy": _make_mock_numpy()}):
+        with patch.object(scorer, "perplexity", return_value=50.0):
+            result = scorer.score("hello world", "hello world again here")
 
     assert set(result.keys()) == {
         "semantic_similarity",
@@ -200,8 +229,9 @@ def test_score_composite_in_unit_range():
     scorer = LocalQualityScorer()
     scorer._st_model = _make_st_model([[1.0, 0.0], [0.0, 1.0]])
 
-    with patch.object(scorer, "perplexity", return_value=100.0):
-        res = scorer.score("quick brown fox", "lazy dog jumps over fence now")
+    with patch.dict(sys.modules, {"numpy": _make_mock_numpy()}):
+        with patch.object(scorer, "perplexity", return_value=100.0):
+            res = scorer.score("quick brown fox", "lazy dog jumps over fence now")
 
     assert 0.0 <= res["composite"] <= 1.0
     assert 0.0 <= res["fluency"] <= 1.0
@@ -212,8 +242,9 @@ def test_score_fluency_formula():
     scorer._st_model = _make_st_model([[1.0], [1.0]])
 
     ppl = 20.0
-    with patch.object(scorer, "perplexity", return_value=ppl):
-        res = scorer.score("test", "test sentence here now extra")
+    with patch.dict(sys.modules, {"numpy": _make_mock_numpy()}):
+        with patch.object(scorer, "perplexity", return_value=ppl):
+            res = scorer.score("test", "test sentence here now extra")
 
     expected_fluency = round(1.0 / (1.0 + math.log(ppl)), 4)
     assert res["fluency"] == expected_fluency
@@ -221,13 +252,13 @@ def test_score_fluency_formula():
 
 def test_score_composite_formula():
     scorer = LocalQualityScorer()
-    # sim ≈ 1 (same vector), diversity deterministic
     scorer._st_model = _make_st_model([[1.0, 0.0], [1.0, 0.0]])
     text = "one two three four five"
 
     ppl = 10.0
-    with patch.object(scorer, "perplexity", return_value=ppl):
-        res = scorer.score("anything", text)
+    with patch.dict(sys.modules, {"numpy": _make_mock_numpy()}):
+        with patch.object(scorer, "perplexity", return_value=ppl):
+            res = scorer.score("anything", text)
 
     sim = res["semantic_similarity"]
     div = res["ngram_diversity"]

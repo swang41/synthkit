@@ -57,6 +57,49 @@ def test_anthropic_provider_calls_messages_create(monkeypatch):
     )
 
 
+def test_anthropic_provider_warns_on_seed(monkeypatch):
+    fake_content = MagicMock()
+    fake_content.text = "hi"
+    fake_response = MagicMock()
+    fake_response.content = [fake_content]
+    fake_client = MagicMock()
+    fake_client.messages.create.return_value = fake_response
+    fake_anthropic_module = MagicMock()
+    fake_anthropic_module.Anthropic.return_value = fake_client
+    monkeypatch.setitem(__import__("sys").modules, "anthropic", fake_anthropic_module)
+
+    provider = AnthropicProvider(model="claude-test")
+    provider._client = None
+
+    with pytest.warns(UserWarning, match="does not support seed"):
+        provider.generate("hello", seed=1)
+
+
+def test_anthropic_provider_warns_only_once(monkeypatch):
+    fake_content = MagicMock()
+    fake_content.text = "hi"
+    fake_response = MagicMock()
+    fake_response.content = [fake_content]
+    fake_client = MagicMock()
+    fake_client.messages.create.return_value = fake_response
+    fake_anthropic_module = MagicMock()
+    fake_anthropic_module.Anthropic.return_value = fake_client
+    monkeypatch.setitem(__import__("sys").modules, "anthropic", fake_anthropic_module)
+
+    provider = AnthropicProvider(model="claude-test")
+    provider._client = None
+
+    import warnings
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        provider.generate("first call", seed=1)
+        provider.generate("second call", seed=2)
+
+    seed_warnings = [x for x in w if issubclass(x.category, UserWarning) and "seed" in str(x.message)]
+    assert len(seed_warnings) == 1
+
+
 def test_anthropic_provider_empty_content_returns_empty_string(monkeypatch):
     fake_response = MagicMock()
     fake_response.content = []
