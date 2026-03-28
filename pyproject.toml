@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "synthkit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Lightweight synthetic data toolkit (HF-first)."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,6 +12,10 @@ dependencies = []
 
 [project.optional-dependencies]
 local = ["transformers>=4.41.0", "torch>=2.1.0", "accelerate>=0.30.0"]
+anthropic = ["anthropic>=0.25.0"]
+openai = ["openai>=1.0.0"]
+quality = ["sentence-transformers>=2.2.0", "transformers>=4.41.0", "torch>=2.1.0"]
+benchmark = ["sentence-transformers>=2.2.0", "transformers>=4.41.0", "torch>=2.1.0"]
 ui = ["gradio>=4.0.0"]
 dev = ["pytest>=8.0.0"]
 
